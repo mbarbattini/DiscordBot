@@ -5,60 +5,56 @@ import requests
 import json
 import numbergame
 import random
+import asyncio
 
 load_dotenv()
 
-client = discord.Client()
+class MyClient(discord.Client):
+    async def on_ready(self):
+        print('We have logged in as {0.user}'.format(client))
 
-sad_words = ['mean', 'depressed', 'unhappy', 'angry', 'miserable', 'depressing']
+    async def on_message(self, message):
+        # console log
+        print('Message from {0.author}: {0.content}'.format(message))
 
-starter_encouragements = [
-    'Cheer up!',
-    'Hang in there.',
-    'You are a great person!',
-    'You can do it!'
-]
-# inspirational quote from zenquotes.com
-def get_quote():
-    response = requests.get('https://zenquotes.io/api/random')
-    json_data = json.loads(response.text)
-    quote = json_data[0]['q'] + ' -' + json_data[0]['a']
-    return quote
+        # do not reply to a bot
+        if message.author == client.user:
+            return
 
-@client.event
-async def on_ready():
-    print('We have logged in as {0.user}'.format(client))
+        # random number game
+        if message.content.startswith('!numbergame'):
+            await message.channel.send('Guess a number between 1 and 1000')
 
-@client.event
-async def on_message(message):
-    # do not reply to a bot
-    if message.author == client.user:
-        return
-    
-    msg = message.content
+            def is_correct(m):
+                return m.author == message.author and m.content.isdigit()
 
-    if message.content.startswith('!inspire'):
-        quote = get_quote()
-        await message.channel.send(quote)
+            answer = random.randint(1, 1000)
 
-    #if message.content.startswith('!hello'):
-    #    await message.channel.send('Hello!')
+            try:
+                guess = await self.wait_for('message', check=is_correct, timeout=5.0)
+            except asyncio.TimeoutError:
+                return await message.channel.send('Sorry, you took too long to respond. The correct answer was {}'.format(answer))
 
-    #if message.content.startswith('!numbergame'):
-    #    randomNumberGenerator(args)
+            if int(guess.content) == answer:
+                await message.channel.send('You are right!')
+            else:
+                await message.channel.send('You were wrong. The correct answer was {}'.format(answer))
 
-    if any(word in msg for word in sad_words):
-        await message.channel.send(random.choice(starter_encouragements))
+        # inspiration quote generator
+        sad_words = ['mean', 'depressed', 'unhappy', 'angry', 'miserable', 'depressing']
 
+        def get_quote():
+            response = requests.get('https://zenquotes.io/api/random')
+            json_data = json.loads(response.text)
+            quote = json_data[0]['q'] + ' -' + json_data[0]['a']
+            return quote
 
-
-
-
-
-
-
-
-
-
-# login the bot
+        if message.content.startswith('!inspire'):
+            quote = get_quote()
+            await message.channel.send(quote)
+        
+# create client object
+client = MyClient()
+# bot login
 client.run(os.getenv('TOKEN'))
+
